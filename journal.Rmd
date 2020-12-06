@@ -32,7 +32,7 @@ bikeshops_tbl  <- read_excel("C:/Users/anilm/OneDrive/Documents/GitHub/datascien
 #examine files
 
 #join files using the keys product id, bikeshop id and customer id
-bike_orderlines_joined_tbl <- orderlines_tbl %>%
+  orderlines_joined_tbl <- orderlines_tbl %>%
   left_join(bikes_tbl, by = c("product.id" = "bike.id")) %>%
   left_join(bikeshops_tbl, by = c("customer.id" = "bikeshop.id"))
 
