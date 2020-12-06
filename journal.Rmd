@@ -1,7 +1,7 @@
 ---
 title: "Journal (reproducible report)"
 author: "Anil Chandrashekar"
-date: "2020-11-05"
+date: "2020-12-06"
 output:
   html_document:
     toc: true
@@ -12,43 +12,530 @@ output:
     #code_folding: hide
 ---
 
-```{r setup, include=FALSE}
+{r setup, include=FALSE}
 knitr::opts_chunk$set(message=FALSE,warning=FALSE, cache=TRUE)
-```
 
-**IMPORTANT:** You can delete everything in here and start fresh. You might want to start by not deleting anything above this line until you know what that stuff is doing.
 
-This is an `.Rmd` file. It is plain text with special features. Any time you write just like this, it will be compiled to normal text in the website. If you put a \# in front of your text, it will create a top level-header.
+# Introduction to Tidyverse
 
-# My first post
-
-Last compiled: `r Sys.Date()`
-
-Notice that whatever you define as a top level header, automatically gets put into the table of contents bar on the left. 
-
-## Second level header
-
-You can add more headers by adding more hashtags. These won't be put into the table of contents
-
-### third level header
-
-Here's an even lower level header
-
-# My second post (note the order)
-
-Last compiled: `r Sys.Date()`
-
-I'm writing this tutorial going from the top down. And, this is how it will be printed. So, notice the second post is second in the list. If you want your most recent post to be at the top, then make a new post starting at the top. If you want the oldest first, do, then keep adding to the bottom
-
-# Adding R stuff
-
-So far this is just a blog where you can write in plain text and serve your writing to a webpage. One of the main purposes of this lab journal is to record your progress learning R. The reason I am asking you to use this process is because you can both make a website, and a lab journal, and learn R all in R-studio. This makes everything really convenient and in the same place. 
-
-So, let's say you are learning how to make a histogram in R. For example, maybe you want to sample 100 numbers from a normal distribution with mean = 0, and standard deviation = 1, and then you want to plot a histogram. You can do this right here by using an r code block, like this:
+Challenge 1
 
 ```{r}
-samples <- rnorm(100, mean=0, sd=1)
-hist(samples)
+library(tidyverse)
+library(readxl)
+library(lubridate)
+#load files
+bikes_tbl      <- read_excel("C:/Users/anilm/OneDrive/Documents/GitHub/datascience/01_bike_sales/01_raw_data/bikes.xlsx")
+orderlines_tbl <- read_excel("C:/Users/anilm/OneDrive/Documents/GitHub/datascience/01_bike_sales/01_raw_data/orderlines.xlsx" )
+bikeshops_tbl  <- read_excel("C:/Users/anilm/OneDrive/Documents/GitHub/datascience/01_bike_sales/01_raw_data/bikeshops.xlsx")
+
+#examine files
+
+#join files using the keys product id, bikeshop id and customer id
+bike_orderlines_joined_tbl <- orderlines_tbl %>%
+  left_join(bikes_tbl, by = c("product.id" = "bike.id")) %>%
+  left_join(bikeshops_tbl, by = c("customer.id" = "bikeshop.id"))
+
+#Examine the joined files 
+
+# Select State as feature and examine the data 
+
+# wrangle data 
+bike_orderlines_wrangled_tbl <- bike_orderlines_joined_tbl %>%
+  separate(col    = location,
+           into   = c("city","state"),
+           sep    = ",") %>%
+  mutate(total.price = price * quantity) %>%
+  select(-...1, -gender) %>%
+  select(-ends_with(".id")) %>%
+  bind_cols(bike_orderlines_joined_tbl %>% select(order.id)) %>% 
+  
+  select(order.id, contains("order"), contains("model"), contains("city"),state,
+         price, quantity, total.price,
+         everything()) %>%
+  rename(bikeshop = name) %>%
+  set_names(names(.) %>% str_replace_all("\\.", "_"))
+
+#extract required column
+sales_by_year_tbl <- bike_orderlines_wrangled_tbl %>%
+  select(order_date, total_price) %>%
+  mutate(year = year(order_date)) %>%
+  group_by(year) %>% 
+  summarize(sales = sum(total_price)) %>%
+  mutate(sales_text = scales::dollar(sales, big.mark = ".", 
+                                     decimal.mark = ",", 
+                                     prefix = "", 
+                                     suffix = "???"))
+
+
+
+#plot bar chart
+sales_by_year_tbl %>%
+  
+  # Setup canvas with the columns year (x-axis) and sales (y-axis)
+  ggplot(aes(x = year, y = sales)) +
+  
+  # Geometries
+  geom_col(fill = "#2DC6D6") + # Use geom_col for a bar plot
+  geom_label(aes(label = sales_text)) + # Adding labels to the bars
+  geom_smooth(method = "lm", se = FALSE) + # Adding a trendline
+  scale_y_continuous(labels = scales::dollar_format(big.mark = ".", 
+                                                    decimal.mark = ",", 
+                                                    prefix = "", 
+                                                    suffix = "???")) +
+  labs(
+    title    = "Revenue by year",
+    subtitle = "Upward Trend",
+    x = "", # Override defaults for x and y
+    y = "Revenue"
+  )
+
+
+sales_by_year_state_tbl <- bike_orderlines_wrangled_tbl %>%
+  
+  # Select columns and add a year
+  select(order_date, total_price, state) %>%
+  mutate(year = year(order_date)) %>%
+  
+  # Group by and summarize year and main catgegory
+  group_by(year, state) %>%
+  summarise(sales = sum(total_price)) %>%
+  ungroup() %>%
+  
+  # Format $ Text
+  mutate(sales_text = scales::dollar(sales, big.mark = ".", 
+                                     decimal.mark = ",", 
+                                     prefix = "", 
+                                     suffix = "???"))
+
+#plot by year and locATION 
+
+
+
+sales_by_year_state_tbl %>%
+
+  ggplot(aes(x = year, y = sales, fill = state)) +
+  geom_col() + theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+
+  facet_wrap(~ state, scales = "free_y") +
+  
+  scale_y_continuous(labels = scales::dollar_format(big.mark = ".", 
+                                                    decimal.mark = ",", 
+                                                    prefix = "", 
+                                                    suffix = "???")) +
+  labs(
+    title = "Revenue by year and state",
+    subtitle = "Each product category has an upward trend",
+    fill = "State" # Changes the legend name
+  )
+
+
+library("writexl")
+bike_orderlines_wrangled_tbl %>%
+  write_xlsx("C:/Users/anilm/OneDrive/Documents/GitHub/datascience/01_bike_sales/01_raw_data/bike_orderlines.xlsx")
+# 7.2 CSV ----
+bike_orderlines_wrangled_tbl %>% 
+  write_csv("C:/Users/anilm/OneDrive/Documents/GitHub/datascience/01_bike_sales/01_raw_data/bike_orderlines.csv")
+
+
+# 7.3 RDS ----
+
+bike_orderlines_wrangled_tbl %>% 
+  write_rds("C:/Users/anilm/OneDrive/Documents/GitHub/datascience/01_bike_sales/01_raw_data/bike_orderlines.rds")
+
 ```
 
-When you knit this R Markdown document, you will see that the histogram is printed to the page, along with the R code. This document can be set up to hide the R code in the webpage, just delete the comment (hashtag) from the cold folding option in the yaml header up top. For purposes of letting yourself see the code, and me see the code, best to keep it the way that it is. You'll learn that all of these things and more can be customized in each R code block.
+
+# Data Acquisition
+
+Challenge 1
+
+This API to find out when the ISS (International Space Station) will be passing over Hamburg (which is at latitude 53.5511, longitude: 9.9937):
+This API returns times to us in the form of Unix time.
+
+```{r}
+library(glue)
+library(httr)
+library(jsonlite)
+resp <- GET("http://api.open-notify.org/iss-pass.json", query = list(lat =53.5511, lon = 9.9937))
+resp
+data = fromJSON(rawToChar(resp$content))
+data
+
+```
+
+Challenge 2
+
+```{r}
+library(tidyverse) # Main Package - Loads dplyr, purrr, etc.
+library(rvest)     # HTML Hacking & Web Scraping
+library(xopen)     # Quickly opening URLs
+library(jsonlite)  # converts JSON files to R objects
+library(glue)      # concatenate strings
+library(stringi)   # character string/text processing
+
+url_home          <- "https://www.radon-bikes.de/"
+xopen(url_home)
+html_home         <- read_html(url_home)
+bike_family_tbl <- html_home %>%
+html_nodes(css = ".megamenu__item > a") %>%  
+html_attr('href') %>%  
+discard(.p = ~stringr::str_detect(.x,"wear")) %>%  
+enframe(name = "position", value = "cat_subcat_url") %>%  
+  
+mutate(family_id = str_glue("https://www.radon-bikes.de{cat_subcat_url}bikegrid"))
+bike_family_tbl
+
+
+bike_category_url <- bike_family_tbl$family_id[1]
+xopen(bike_category_url)
+html_bike_category  <- read_html(bike_category_url)
+
+bike_name_tbl        <- html_bike_category %>%
+html_nodes(css = ".m-bikegrid__info .a-heading--small") %>%
+html_text() %>%
+
+
+enframe(name = "position", value = "name")
+bike_name_tbl 
+
+bike_price_tbl <- html_bike_category %>%
+html_nodes(css = ".m-bikegrid__price.currency_eur .m-bikegrid__price--active") %>%  
+html_text() %>% 
+enframe(name = "position", value = "price")
+bike_price_tbl
+
+model_price_tbl <- left_join(bike_name_tbl, bike_price_tbl)%>% 
+select(name, price)
+model_price_tbl
+```
+
+
+# Data Wrangling
+
+Challenge 1
+
+```{r}
+library(vroom)
+library(data.table)
+library(tidyverse)
+col_types <- list(
+  id = col_character(),
+  type = col_character(),
+  name_first = col_character(),
+  name_last = col_character(),
+  organization = col_character()
+)
+
+assignee_tbl <- vroom(
+  file       = "C:/Users/anilm/OneDrive/Documents/GitHub/datascience/assignee.tsv", 
+  delim      = "\t", 
+  col_types  = col_types,
+  na         = c("", "NA", "NULL")
+)
+
+col_types <- list(
+  patent_id = col_character(),
+  assignee_id = col_character(),
+  location_id = col_character()
+)
+
+patent_assignee_tbl <- vroom(
+  file       = "C:/Users/anilm/OneDrive/Documents/GitHub/datascience/patent_assignee.tsv", 
+  delim      = "\t", 
+  col_types  = col_types,
+  na         = c("", "NA", "NULL")
+)
+
+Join_tbl <- merge(patent_assignee_tbl,assignee_tbl, by.x = "assignee_id", by.y = "id") 
+
+num_tbl<- Join_tbl%>%
+  select(patent_id,organization)%>% 
+  count(organization)%>%
+  group_by(organization) 
+
+final_tbl <- num_tbl %>%
+  select (organization,n)%>%
+  arrange(desc(n))
+
+#List of top ten companies with most assigned/granted patents.
+
+head(final_tbl,10)
+```
+
+Challenge 2
+
+```{r}
+library(vroom)
+library(data.table)
+library(tidyverse)
+library(lubridate)
+
+col_types <- list(
+  id = col_character(),
+  type = col_character(),
+  name_first = col_character(),
+  name_last = col_character(),
+  organization = col_character()
+)
+
+assignee_tbl <- vroom(
+  file       = "C:/Users/anilm/OneDrive/Documents/GitHub/datascience/assignee.tsv", 
+  delim      = "\t", 
+  col_types  = col_types,
+  na         = c("", "NA", "NULL")
+)
+
+col_types <- list(
+  patent_id = col_character(),
+  assignee_id = col_character(),
+  location_id = col_character()
+)
+
+patent_assignee_tbl <- vroom(
+  file       = "C:/Users/anilm/OneDrive/Documents/GitHub/datascience/patent_assignee.tsv", 
+  delim      = "\t", 
+  col_types  = col_types,
+  na         = c("", "NA", "NULL")
+)
+
+col_types <- list(
+  id = col_character(),
+  type = col_character(),
+  number = col_character(),
+  country = col_character(),
+  date = col_date("%Y-%m-%d"),
+  abstract = col_character(),
+  title = col_character(),
+  kind = col_character(),
+  num_claims = col_double(),
+  filename = col_character(),
+  withdrawn = col_character()
+)
+
+patent_tbl <- vroom(
+  file       = "C:/Users/anilm/OneDrive/Documents/GitHub/datascience/patent.tsv", 
+  delim      = "\t", 
+  col_types  = col_types,
+  na         = c("", "NA", "NULL")
+)
+
+Join_tbl <- merge(patent_assignee_tbl,assignee_tbl, by.x = "assignee_id", by.y = "id") 
+Join_1_tbl <- merge(patent_tbl,Join_tbl, by.x="id", by.y ="patent_id") 
+
+Filter_2019_tbl <- Join_1_tbl %>%
+  select("id", "date", "country","organization")%>%
+  filter(between(date,as.Date("2019-01-01"), as.Date("2020-01-01")))%>%
+  count(organization)%>%
+  group_by(organization)    
+
+
+
+Final_tbl <- Filter_2019_tbl %>%
+  select (organization,n)%>%
+  arrange(desc(n))
+
+#list of 10 organisation 
+
+head(Final_tbl,10)
+```
+
+Challenge 3
+
+```{r}
+# list of the top 10 companies (worldwide) with the most patents. The top 5 USPTO tech main classes
+library(vroom)
+library(data.table)
+library(tidyverse)
+library(lubridate)
+
+
+col_types <- list(
+  id = col_character(),
+  type = col_character(),
+  name_first = col_character(),
+  name_last = col_character(),
+  organization = col_character()
+)
+
+assignee_tbl <- vroom(
+  file       = "C:/Users/anilm/OneDrive/Documents/GitHub/datascience/assignee.tsv", 
+  delim      = "\t", 
+  col_types  = col_types,
+  na         = c("", "NA", "NULL")
+)
+
+col_types <- list(
+  patent_id = col_character(),
+  assignee_id = col_character(),
+  location_id = col_character()
+)
+
+patent_assignee_tbl <- vroom(
+  file       = "C:/Users/anilm/OneDrive/Documents/GitHub/datascience/patent_assignee.tsv", 
+  delim      = "\t", 
+  col_types  = col_types,
+  na         = c("", "NA", "NULL")
+)
+
+col_types <- list(
+  uuid = col_character(),
+  patent_id = col_character(),
+  mainclass_id = col_character(),
+  subclass_id = col_character(),
+  sequence = col_character()
+  
+)
+
+uspc_tbl <- vroom(
+  file       = "C:/Users/anilm/OneDrive/Documents/GitHub/datascience/uspc.tsv", 
+  delim      = "\t", 
+  col_types  = col_types,
+  na         = c("", "NA", "NULL")
+)
+
+Join_tbl <- merge(patent_assignee_tbl,assignee_tbl, by.x = "assignee_id", by.y = "id") 
+Join_tbl_3 <- merge(Join_tbl,uspc_tbl, by = "patent_id")
+
+
+
+final_tbl <- Join_tbl_3 %>%
+  select(patent_id,organization,mainclass_id,sequence)%>%
+  group_by(organization)%>%
+  sort(n, decreasing = TRUE)%>%
+  filter(sequence == 4)
+```
+
+
+
+
+# Data Visualization
+
+
+Challenge 1
+
+```{r}
+library(tidyverse)
+library(data.table)
+library(ggplot2)
+library(ggrepel)
+library(mapproj)
+
+
+url <- "https://opendata.ecdc.europa.eu/covid19/casedistribution/csv"
+covid_data_tbl <- fread(url)
+
+class(covid_data_tbl)
+colnames(covid_data_tbl)
+str(covid_data_tbl)
+
+#check the unique country present.
+unique(covid_data_tbl$countriesAndTerritories)
+
+#getting month name column
+covid_data_tbl$month_name<-months(as.Date(covid_data_tbl$dateRep))
+
+##rolling up data to month year country Level
+covid_mon_yr_country_lvl <- covid_data_tbl %>% 
+  dplyr::group_by(month,month_name,year,countriesAndTerritories,geoId,countryterritoryCode,continentExp) %>% 
+  dplyr::summarise(cases = sum(cases, na.rm = T)) %>% 
+  dplyr::ungroup()
+
+##creating Cummulative Cases column
+covid_mon_yr_country_lvl <- covid_mon_yr_country_lvl %>% 
+  dplyr::arrange(countriesAndTerritories,year,month) %>% 
+  dplyr::group_by(countriesAndTerritories) %>% 
+  dplyr::mutate(cumulative_cases = cumsum(cases)) %>% 
+  dplyr::ungroup()
+
+##I am filtering only for those shown in the graph and for the year = 2020
+covid_mon_yr_country_lvl_fil<- covid_mon_yr_country_lvl %>% 
+  dplyr::filter(countriesAndTerritories %in% c("Germany","Spain","France","United_Kingdom","United_States_of_America")& year == 2020) %>%
+  dplyr::rename('Continent_Country' = countriesAndTerritories)
+
+#Graph using ggploat
+covid_mon_yr_country_lvl_fil %>% 
+  mutate(label = if_else(month_name == "December",as.character(cumulative_cases),NA_character_)) %>% 
+  ggplot(aes(x=month,y =cumulative_cases))+
+  geom_line(aes(color = Continent_Country))+
+  scale_colour_brewer(palette = "Set1")+
+  scale_x_continuous(breaks=covid_mon_yr_country_lvl_fil$month,labels = covid_mon_yr_country_lvl_fil$month_name)+
+  scale_y_continuous(labels = scales::dollar_format(scale = 1/1e6,
+                                                    prefix = "",
+                                                    suffix = "M"))+
+  labs(title = "COVID-19 confirmed cases worldwide",
+       subtitle =  "As of 12/5/2020,USA has the highest cases.",
+       x = "Year 2020",
+       y= "Cumulative Cases"
+  )+
+  theme(legend.position = "bottom",
+        axis.text.x = element_text(angle=45,hjust = 1))+
+  geom_label_repel(aes(label=label),
+                   nudge_x = 1,na.rm = TRUE)
+
+```
+
+Challenge 2
+
+```{r}
+cat("\014")
+library(ggplot2)
+library(dplyr)
+library(tidyverse)
+library(ggthemes)
+library(lubridate)
+library(ggrepel)
+library(maps)
+library(readr)
+library(scales)
+## DATA PREPARATION
+covid_data_tbl <- read_csv("https://opendata.ecdc.europa.eu/covid19/casedistribution/csv")
+
+
+covid_mortality_rate <- covid_data_tbl %>%
+  select(countriesAndTerritories, deaths, popData2019) %>% 
+  set_names(c("country", "deaths", "population")) %>%
+  
+  # Selecting columns to focus on and adding a month column
+  mutate(mortality_rate = deaths/population)%>%
+  mutate(across(country, str_replace_all, "_", " ")) %>%
+  mutate(country = case_when(
+    
+    country == "United Kingdom" ~ "UK",
+    country == "United States of America" ~ "USA",
+    country == "Czechia" ~ "Czech Republic",
+    TRUE ~ country
+  )) %>%
+  
+  group_by(country) %>%
+  summarize(deaths=sum(deaths),population=max(population),mortality_rate = sum(mortality_rate)) %>%
+  ungroup() 
+ 
+
+world <- map_data("world")
+
+covid_world_mortality_rate <- left_join(x = world, y = covid_mortality_rate, by=c("region" = "country")) 
+
+ggplot(covid_world_mortality_rate, aes(x=long, y=lat, group = group, fill = (mortality_rate))) + 
+  geom_polygon(colour = "white") +
+  scale_fill_continuous(low = "dodgerblue",
+                        high = "black",
+                        guide="colorbar",
+                        labels=percent,
+                        limits = c(0, .0015)) +
+   
+  
+  
+  theme_bw() +
+  labs(fill = "Mortality Rate" ,
+       title = "Confirmed COVID-19 deaths relative to the size of population", 
+       subtitle = "More than 1.5 Million confirmed COVID-19 deaths worldwide",
+       x="long", 
+       y="lat") 
+
+
+
+  # scale_y_continuous(breaks=c()) +
+  # scale_x_continuous(breaks=c()) +
+  # theme()
+```
