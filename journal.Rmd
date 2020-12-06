@@ -132,16 +132,16 @@ sales_by_year_state_tbl %>%
 
 library("writexl")
 bike_orderlines_wrangled_tbl %>%
-  write_xlsx("C:/Users/anilm/OneDrive/Documents/GitHub/datascience/01_bike_sales/01_raw_data/bike_orderlines.xlsx")
+  write_xlsx("C:/Users/anilm/OneDrive/Documents/GitHub/datascience/01_bike_sales/01_raw_data/orderlines.xlsx")
 # 7.2 CSV ----
 bike_orderlines_wrangled_tbl %>% 
-  write_csv("C:/Users/anilm/OneDrive/Documents/GitHub/datascience/01_bike_sales/01_raw_data/bike_orderlines.csv")
+  write_csv("C:/Users/anilm/OneDrive/Documents/GitHub/datascience/01_bike_sales/01_raw_data/orderlines.csv")
 
 
 # 7.3 RDS ----
 
 bike_orderlines_wrangled_tbl %>% 
-  write_rds("C:/Users/anilm/OneDrive/Documents/GitHub/datascience/01_bike_sales/01_raw_data/bike_orderlines.rds")
+  write_rds("C:/Users/anilm/OneDrive/Documents/GitHub/datascience/01_bike_sales/01_raw_data/orderlines.rds")
 
 ```
 

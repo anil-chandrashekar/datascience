@@ -1,0 +1,1 @@
+# list of the top 10 companies (worldwide) with the most patents. The top 5 USPTO tech main classes
