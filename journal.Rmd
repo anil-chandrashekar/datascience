@@ -36,7 +36,7 @@ bikeshops_tbl  <- read_excel("C:/Users/anilm/OneDrive/Documents/GitHub/datascien
   left_join(bikes_tbl, by = c("product.id" = "bike.id")) %>%
   left_join(bikeshops_tbl, by = c("customer.id" = "bikeshop.id"))
 
-#Examine the joined files 
+# Examine the joined files 
 
 # Select State as feature and examine the data 
 
